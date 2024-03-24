@@ -34,3 +34,6 @@ class OrderItem(models.Model):
     quantity = models.SmallIntegerField()
     unit_price = models.DecimalField(max_digits = 6, decimal_places = 2)
     price = models.DecimalField(max_digits = 6, decimal_places = 2)
+
+    class Meta:
+        unique_together = ('order', 'menu_item')
