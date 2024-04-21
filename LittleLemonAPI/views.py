@@ -6,7 +6,7 @@ from .models import MenuItem, OrderItem, Cart, Order
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.contrib.auth.models import User, Group
 from rest_framework.response import Response
-from decimal import Decimal
+from .permissions import *
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 
 # Create your views here.
@@ -15,8 +15,9 @@ from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 
 class AdminsForPostMixin():
     def get_permissions(self):
+        print(self.request.method)
         if self.request.method == 'POST':
-            return [IsAdminUser()]
+            return [IsAuthenticated(), IsManager()]
         
         return [AllowAny()]
     
@@ -27,7 +28,7 @@ class ThrottleForAnonsAndUsersMixin():
 
 # Views
 
-class MenuItemsView(generics.ListAPIView, generics.ListCreateAPIView, AdminsForPostMixin, ThrottleForAnonsAndUsersMixin):
+class MenuItemsView(AdminsForPostMixin, ThrottleForAnonsAndUsersMixin, generics.ListAPIView, generics.ListCreateAPIView):
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
     ordering_fields = ['price']
