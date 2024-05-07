@@ -1,7 +1,7 @@
 from rest_framework import generics
 from django.shortcuts import get_object_or_404
 from django.http.response import JsonResponse, HttpResponseBadRequest
-from .serializers import MenuItemSerializer, UserSerializer, UserCartSerializer, UserOrdersSerializer
+from .serializers import MenuItemSerializer, UserSerializer, UserCartSerializer, OrderItemSerializer, UserOrdersSerializer
 from .models import MenuItem, OrderItem, Cart, Order
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.contrib.auth.models import User, Group
@@ -41,7 +41,7 @@ class MenuItemView(generics.RetrieveAPIView, generics.RetrieveUpdateDestroyAPIVi
 
 
 class ManagersView(generics.ListCreateAPIView, ThrottleForAnonsAndUsersMixin):
-    queryset = User.objects.filter(groups__name='Managers')
+    queryset = User.objects.filter(groups__name='manager')
     serializer_class = UserSerializer
     permission_classes = [IsAdminUser]
 
@@ -134,9 +134,9 @@ class OrdersView(generics.ListCreateAPIView, ThrottleForAnonsAndUsersMixin):
     serializer_class = UserOrdersSerializer
         
     def get_queryset(self, *args, **kwargs):
-        if self.request.user.groups.filter(name='Managers').exists() or self.request.user.is_superuser == True :
+        if self.request.user.groups.filter(name='manager').exists() or self.request.user.is_superuser == True :
             query = Order.objects.all()
-        elif self.request.user.groups.filter(name='Delivery crew').exists():
+        elif self.request.user.groups.filter(name='delivery-crew').exists():
             query = Order.objects.filter(delivery_crew=self.request.user)
         else:
             query = Order.objects.filter(user=self.request.user)
@@ -172,9 +172,10 @@ class OrderView(generics.ListCreateAPIView, ThrottleForAnonsAndUsersMixin):
     serializer_class = UserOrdersSerializer
     
     def get_permissions(self):
-        order = Order.objects.get(pk=self.kwargs['pk'])
-        if self.request.user == order.user and self.request.method == 'GET':
+        order = Order.objects.get(pk=self.kwargs['orderId'])
+        if (self.request.user == order.user or self.request.user.groups.filter(name='manager').exists()) and self.request.method == 'GET':
             permission_classes = [IsAuthenticated]
+            self.serializer_class = OrderItemSerializer
         elif self.request.method == 'PUT' or self.request.method == 'DELETE':
             permission_classes = [IsAuthenticated, IsAdminUser]
         else:
@@ -182,11 +183,11 @@ class OrderView(generics.ListCreateAPIView, ThrottleForAnonsAndUsersMixin):
         return[permission() for permission in permission_classes] 
 
     def get_queryset(self, *args, **kwargs):
-            query = OrderItem.objects.filter(order_id=self.kwargs['pk'])
+            query = OrderItem.objects.filter(order_id=self.kwargs['orderId'])
             return query
 
     def patch(self, request, *args, **kwargs):
-        order = Order.objects.get(pk=self.kwargs['pk'])
+        order = Order.objects.get(pk=self.kwargs['orderId'])
         order.status = not order.status
         order.save()
         return JsonResponse(status=200, data={'message':'Status of order #'+ str(order.id)+' changed to '+str(order.status)})
